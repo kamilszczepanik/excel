@@ -74,7 +74,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
       setEditingCell(cellId);
       setEditValue(cellData.value);
     },
-    [cells]
+    [cells],
   );
 
   const handleCellChange = useCallback((value: string) => {
@@ -93,7 +93,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
       });
       setEditingCell(null);
     },
-    []
+    [],
   );
 
   const handleKeyDown = useCallback(
@@ -123,7 +123,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
         case "ArrowLeft":
           if (currentCol > 0) {
             setSelectedCell(
-              `${columnHeaders[currentCol - 1]}${currentRow + 1}`
+              `${columnHeaders[currentCol - 1]}${currentRow + 1}`,
             );
           }
           e.preventDefault();
@@ -131,7 +131,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
         case "ArrowRight":
           if (currentCol < colCount - 1) {
             setSelectedCell(
-              `${columnHeaders[currentCol + 1]}${currentRow + 1}`
+              `${columnHeaders[currentCol + 1]}${currentRow + 1}`,
             );
           }
           e.preventDefault();
@@ -161,7 +161,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
       columnHeaders,
       handleCellDoubleClick,
       handleCellEditComplete,
-    ]
+    ],
   );
 
   const handleScroll = useCallback(
@@ -181,12 +181,12 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
       setVisibleRows({ start: startRow, end: endRow });
       setVisibleCols({ start: startCol, end: endCol });
     },
-    [rowCount, colCount]
+    [rowCount, colCount],
   );
 
   return (
     <div
-      className="w-full h-full relative overflow-auto"
+      className="relative h-full w-full overflow-auto"
       onKeyDown={handleKeyDown}
       onScroll={handleScroll}
     >
@@ -209,7 +209,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
             return (
               <div key={`row-${row}`} className="row flex">
                 <div
-                  className={`${ROW_HEADER_WIDTH} border-r border-b text-center font-bold sticky left-0 z-[1]`}
+                  className={`${ROW_HEADER_WIDTH} sticky left-0 z-[1] border-r border-b text-center font-bold`}
                 >
                   {row + 1}
                 </div>
@@ -228,8 +228,8 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
                       <div
                         key={`cell-${cellId}`}
                         className={cn(
-                          `cell border border-gray-200 px-1 overflow-hidden whitespace-nowrap text-ellipsis relative ${defaultColWidth}`,
-                          isSelected ? "outline-2 outline-blue-500" : ""
+                          `cell relative overflow-hidden border border-gray-200 px-1 text-ellipsis whitespace-nowrap ${defaultColWidth}`,
+                          isSelected ? "outline-2 outline-blue-500" : "",
                         )}
                         onClick={() => handleCellSelect(cellId)}
                         onDoubleClick={() => handleCellDoubleClick(cellId)}
@@ -253,7 +253,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
                               e.stopPropagation();
                             }}
                             autoFocus
-                            className="w-full h-full border-none p-0 font-inherit text-inherit outline-none"
+                            className="font-inherit h-full w-full border-none p-0 text-inherit outline-none"
                           />
                         ) : (
                           <span>{cellData.displayValue}</span>
@@ -264,7 +264,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
                 </div>
               </div>
             );
-          }
+          },
         )}
       </div>
     </div>
