@@ -1,10 +1,12 @@
-import Grid from "@/components/Grid";
+import ExcelGrid from "@/components/Grid";
 
 export default function Home() {
   return (
-    <div className="">
+    <div className="excel-container">
       <main>
-        <Grid />
+        <div className="excel-grid">
+          <ExcelGrid />
+        </div>
       </main>
     </div>
   );
