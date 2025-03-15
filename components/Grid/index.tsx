@@ -12,6 +12,7 @@ interface CellData {
   value: string;
   displayValue: string;
   isFormula?: boolean;
+  dependsOn?: Set<string>;
 }
 
 const ROW_HEIGHT = 30;
@@ -19,20 +20,82 @@ const COL_WIDTH = 80;
 const ROW_COUNT = 50;
 const COL_COUNT = 10;
 
-function evaluateFormula(formula: string): string {
+function evaluateFormula(
+  formula: string,
+  getCellValue: (cellId: string) => string,
+  visitedCells: Set<string> = new Set<string>(),
+): string {
   try {
     const expression = formula.substring(1).trim();
 
-    if (/[a-zA-Z$_]/.test(expression)) {
-      return "#ERROR: Only numbers and operators allowed";
+    const cellRefRegex = /[A-Z]+\d+/g;
+
+    const cellRefs: string[] = Array.from(
+      expression.matchAll(cellRefRegex),
+    ).map((match) => match[0]);
+
+    const formulaCell = formula.match(/^=([A-Z]+\d+)$/);
+    if (formulaCell && cellRefs.includes(formulaCell[1])) {
+      return "#CIRCULAR";
     }
 
-    const result = new Function(`return ${expression}`)();
+    const evaluableExpression = expression.replace(cellRefRegex, (cellRef) => {
+      if (visitedCells.has(cellRef)) {
+        throw new Error(`Circular reference detected: ${cellRef}`);
+      }
 
-    return result.toString();
+      const refValue = getCellValue(cellRef);
+
+      if (refValue.startsWith("=")) {
+        const newVisited = new Set(visitedCells);
+        newVisited.add(cellRef);
+        const evaluatedRef = evaluateFormula(
+          refValue,
+          getCellValue,
+          newVisited,
+        );
+
+        if (evaluatedRef.startsWith("#ERROR") || evaluatedRef === "#CIRCULAR") {
+          throw new Error(
+            `Error in referenced cell ${cellRef}: ${evaluatedRef}`,
+          );
+        }
+
+        return evaluatedRef === "" ? "0" : evaluatedRef;
+      }
+
+      if (!refValue || isNaN(Number(refValue))) {
+        if (!refValue) return "0";
+
+        throw new Error(
+          `Cell ${cellRef} contains non-numeric data: ${refValue}`,
+        );
+      }
+
+      return refValue;
+    });
+
+    if (/[a-zA-Z$_]/.test(evaluableExpression)) {
+      return "#ERROR: Invalid cell reference or syntax";
+    }
+
+    const sanitizedExpression = evaluableExpression.replace(/[+\-*/]$/, "");
+
+    try {
+      const result = new Function(`return ${sanitizedExpression}`)();
+
+      return result.toString();
+    } catch (syntaxError) {
+      console.error(
+        "Expression syntax error:",
+        syntaxError,
+        sanitizedExpression,
+      );
+      return "#ERROR: Invalid expression syntax";
+    }
   } catch (error) {
     console.error("Formula evaluation error:", error);
-    return "#ERROR";
+    return error instanceof Error ? `#ERROR: ${error.message}` : "#ERROR";
   }
 }
 
@@ -43,8 +106,10 @@ const ExcelGrid: React.FC = () => {
   const [editValue, setEditValue] = useState("");
   const [isFormulaBarFocused, setIsFormulaBarFocused] = useState(false);
   const [isEditingFormulaBar, setIsEditingFormulaBar] = useState(false);
+  const [dependentCells, setDependentCells] = useState<
+    Map<string, Set<string>>
+  >(new Map());
 
-  // Add a ref to the grid container for focusing
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
   const columnHeaders = useMemo(() => {
@@ -106,26 +171,95 @@ const ExcelGrid: React.FC = () => {
     focusGridWithoutScrolling();
   }, [focusGridWithoutScrolling]);
 
-  const handleCellEditComplete = useCallback(
+  const findCellReferences = useCallback((formula: string): string[] => {
+    if (!formula.startsWith("=")) return [];
+
+    const expression = formula.substring(1).trim();
+    const cellRefRegex = /[A-Z]+\d+/g;
+    return Array.from(expression.matchAll(cellRefRegex)).map(
+      (match) => match[0],
+    );
+  }, []);
+
+  const updateCellAndDependents = useCallback(
     (cellId: string, newValue: string) => {
+      const newDependentCells = new Map(dependentCells);
+
       setCells((prevCells) => {
         const newCells = new Map(prevCells);
+        const updatedCells = new Set<string>();
 
-        const isFormula = newValue.startsWith("=");
-        let displayValue = newValue;
+        const updateCell = (id: string, value: string) => {
+          if (updatedCells.has(id)) return;
+          updatedCells.add(id);
 
-        if (isFormula) {
-          displayValue = evaluateFormula(newValue);
-        }
+          const isFormula = value.startsWith("=");
+          let displayValue = value;
+          let dependsOn: Set<string> | undefined;
 
-        newCells.set(cellId, {
-          value: newValue,
-          displayValue: displayValue,
-          isFormula: isFormula,
-        });
+          const oldCell = prevCells.get(id);
+          if (oldCell && oldCell.dependsOn) {
+            oldCell.dependsOn.forEach((depCellId) => {
+              const deps = newDependentCells.get(depCellId);
+              if (deps) {
+                deps.delete(id);
+                if (deps.size === 0) {
+                  newDependentCells.delete(depCellId);
+                } else {
+                  newDependentCells.set(depCellId, deps);
+                }
+              }
+            });
+          }
+
+          if (isFormula) {
+            dependsOn = new Set(findCellReferences(value));
+            displayValue = evaluateFormula(value, (cellId) => {
+              const cell = newCells.get(cellId);
+              return cell ? cell.value : "";
+            });
+          }
+
+          newCells.set(id, {
+            value,
+            displayValue,
+            isFormula,
+            dependsOn,
+          });
+
+          if (dependsOn) {
+            dependsOn.forEach((depCellId) => {
+              const deps =
+                newDependentCells.get(depCellId) || new Set<string>();
+              deps.add(id);
+              newDependentCells.set(depCellId, deps);
+            });
+          }
+
+          const dependents = newDependentCells.get(id);
+          if (dependents) {
+            dependents.forEach((depId) => {
+              const depCell = newCells.get(depId);
+              if (depCell && depCell.isFormula) {
+                updateCell(depId, depCell.value);
+              }
+            });
+          }
+        };
+
+        updateCell(cellId, newValue);
 
         return newCells;
       });
+
+      setDependentCells(newDependentCells);
+    },
+    [dependentCells, findCellReferences],
+  );
+
+  const handleCellEditComplete = useCallback(
+    (cellId: string, newValue: string) => {
+      updateCellAndDependents(cellId, newValue);
       setEditingCell(null);
       setIsEditingFormulaBar(false);
 
@@ -133,7 +267,7 @@ const ExcelGrid: React.FC = () => {
         focusGridWithoutScrolling();
       }, 0);
     },
-    [focusGridWithoutScrolling],
+    [focusGridWithoutScrolling, updateCellAndDependents],
   );
 
   const handleFormulaBarKeyDown = useCallback(
@@ -406,7 +540,10 @@ const ExcelGrid: React.FC = () => {
                       <span>
                         {isSelected && isFormulaBarFocused
                           ? editValue.startsWith("=")
-                            ? evaluateFormula(editValue)
+                            ? evaluateFormula(
+                                editValue,
+                                (cellId) => getCellData(cellId).value,
+                              )
                             : editValue
                           : cellData.displayValue}
                       </span>
