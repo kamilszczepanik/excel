@@ -1,5 +1,14 @@
 "use client";
-import { cn, getColumnLabel } from "@/utils";
+import { CellData, Cells } from "@/types";
+import { cn, evaluateFormula, getColumnLabel } from "@/utils";
+import {
+  BUFFER_SIZE,
+  COL_COUNT,
+  COL_WIDTH,
+  DEFAULT_CELL,
+  ROW_COUNT,
+  ROW_HEIGHT,
+} from "@/utils/constants";
 import React, {
   useState,
   useCallback,
@@ -8,101 +17,9 @@ import React, {
   useRef,
 } from "react";
 
-interface CellData {
-  value: string;
-  displayValue: string;
-  isFormula?: boolean;
-  dependsOn?: Set<string>;
-}
-
-const ROW_HEIGHT = 30;
-const COL_WIDTH = 80;
-const ROW_COUNT = 10000;
-const COL_COUNT = 10000;
-const BUFFER_SIZE = 5;
-
-function evaluateFormula(
-  formula: string,
-  getCellValue: (cellId: string) => string,
-  visitedCells: Set<string> = new Set<string>(),
-): string {
-  try {
-    const expression = formula.substring(1).trim();
-
-    const cellRefRegex = /[A-Z]+\d+/g;
-
-    const cellRefs: string[] = Array.from(
-      expression.matchAll(cellRefRegex),
-    ).map((match) => match[0]);
-
-    const formulaCell = formula.match(/^=([A-Z]+\d+)$/);
-    if (formulaCell && cellRefs.includes(formulaCell[1])) {
-      return "#CIRCULAR";
-    }
-
-    const evaluableExpression = expression.replace(cellRefRegex, (cellRef) => {
-      if (visitedCells.has(cellRef)) {
-        throw new Error(`Circular reference detected: ${cellRef}`);
-      }
-
-      const refValue = getCellValue(cellRef);
-
-      if (refValue.startsWith("=")) {
-        const newVisited = new Set(visitedCells);
-        newVisited.add(cellRef);
-        const evaluatedRef = evaluateFormula(
-          refValue,
-          getCellValue,
-          newVisited,
-        );
-
-        if (evaluatedRef.startsWith("#ERROR") || evaluatedRef === "#CIRCULAR") {
-          throw new Error(
-            `Error in referenced cell ${cellRef}: ${evaluatedRef}`,
-          );
-        }
-
-        return evaluatedRef === "" ? "0" : evaluatedRef;
-      }
-
-      if (!refValue || isNaN(Number(refValue))) {
-        if (!refValue) return "0";
-
-        throw new Error(
-          `Cell ${cellRef} contains non-numeric data: ${refValue}`,
-        );
-      }
-
-      return refValue;
-    });
-
-    if (/[a-zA-Z$_]/.test(evaluableExpression)) {
-      return "#ERROR: Invalid cell reference or syntax";
-    }
-
-    const sanitizedExpression = evaluableExpression.replace(/[+\-*/]$/, "");
-
-    try {
-      const result = new Function(`return ${sanitizedExpression}`)();
-
-      return result.toString();
-    } catch (syntaxError) {
-      console.error(
-        "Expression syntax error:",
-        syntaxError,
-        sanitizedExpression,
-      );
-      return "#ERROR: Invalid expression syntax";
-    }
-  } catch (error) {
-    console.error("Formula evaluation error:", error);
-    return error instanceof Error ? `#ERROR: ${error.message}` : "#ERROR";
-  }
-}
-
 const ExcelGrid: React.FC = () => {
-  const [cells, setCells] = useState<Map<string, CellData>>(new Map());
-  const [selectedCell, setSelectedCell] = useState<string | null>("A1");
+  const [cells, setCells] = useState<Cells>(new Map());
+  const [selectedCell, setSelectedCell] = useState<string | null>(DEFAULT_CELL);
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [isFormulaBarFocused, setIsFormulaBarFocused] = useState(false);
