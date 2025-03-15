@@ -176,113 +176,131 @@ const ExcelGrid: React.FC = () => {
   }, [selectedCell]);
 
   return (
-    <div
-      className="relative h-screen w-full overflow-auto"
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      onScroll={handleScroll}
-    >
+    <>
+      <div className="flex gap-2 p-2">
+        <input
+          type="text"
+          defaultValue={selectedCell?.toString()}
+          style={{ width: COL_WIDTH }}
+          className={`border-r-1 border-gray-300`}
+        />
+        <input
+          type="text"
+          defaultValue={selectedCell ? getCellData(selectedCell).value : ""}
+          onChange={(e) => {
+            handleCellChange(e.target.value);
+          }}
+          style={{ width: COL_WIDTH * 2 }}
+        />
+      </div>
       <div
-        style={{
-          width: COL_COUNT * COL_WIDTH + 50,
-          height: ROW_COUNT * ROW_HEIGHT + ROW_HEIGHT,
-        }}
+        className="relative h-screen w-full overflow-auto"
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        onScroll={handleScroll}
       >
-        <div className="sticky top-0 z-10 flex bg-gray-100">
-          <div
-            className="sticky left-0 z-20 border border-gray-300 bg-gray-200"
-            style={{ width: "50px", minWidth: "50px", height: ROW_HEIGHT }}
-          />
-
-          {columnHeaders.map((col) => (
+        <div
+          style={{
+            width: COL_COUNT * COL_WIDTH + 50,
+            height: ROW_COUNT * ROW_HEIGHT + ROW_HEIGHT,
+          }}
+        >
+          <div className="sticky top-0 z-10 flex bg-gray-100">
             <div
-              key={col}
-              className={cn(
-                "flex items-center justify-center border border-gray-300 text-center font-bold",
-                col === selectedCellInfo.colLabel ? "bg-blue-200" : "",
-              )}
-              style={{
-                width: COL_WIDTH,
-                minWidth: COL_WIDTH,
-                height: ROW_HEIGHT,
-                flexShrink: 0,
-              }}
+              className="sticky left-0 z-20 border border-gray-300 bg-gray-200"
+              style={{ width: "50px", minWidth: "50px", height: ROW_HEIGHT }}
+            />
+
+            {columnHeaders.map((col) => (
+              <div
+                key={col}
+                className={cn(
+                  "flex items-center justify-center border border-gray-300 text-center font-bold",
+                  col === selectedCellInfo.colLabel ? "bg-blue-200" : "",
+                )}
+                style={{
+                  width: COL_WIDTH,
+                  minWidth: COL_WIDTH,
+                  height: ROW_HEIGHT,
+                  flexShrink: 0,
+                }}
+              >
+                {col}
+              </div>
+            ))}
+          </div>
+
+          {Array.from({ length: ROW_COUNT }).map((_, row) => (
+            <div
+              key={`row-${row}`}
+              className="flex"
+              style={{ height: ROW_HEIGHT }}
             >
-              {col}
+              <div
+                className={cn(
+                  "sticky left-0 z-10 flex items-center justify-center border border-gray-300 text-center font-bold",
+                  row === selectedCellInfo.rowIndex ? "bg-blue-200" : "",
+                )}
+                style={{ width: "50px", minWidth: "50px", height: ROW_HEIGHT }}
+              >
+                {row + 1}
+              </div>
+
+              {columnHeaders.map((colHeader) => {
+                const cellId = `${colHeader}${row + 1}`;
+                const cellData = getCellData(cellId);
+                const isSelected = cellId === selectedCell;
+                const isEditing = cellId === editingCell;
+
+                return (
+                  <div
+                    key={`cell-${cellId}`}
+                    className={cn(
+                      "overflow-hidden border px-1 text-ellipsis whitespace-nowrap",
+                      isSelected
+                        ? "box-border border-2 border-blue-500"
+                        : "border-gray-200",
+                      cellData.isFormula ? "text-yellow-700" : "",
+                    )}
+                    style={{
+                      width: COL_WIDTH,
+                      minWidth: COL_WIDTH,
+                      height: ROW_HEIGHT,
+                      flexShrink: 0,
+                    }}
+                    onClick={() => handleCellSelect(cellId)}
+                    onDoubleClick={() => handleCellDoubleClick(cellId)}
+                  >
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => handleCellChange(e.target.value)}
+                        onBlur={() => handleCellEditComplete(cellId, editValue)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleCellEditComplete(cellId, editValue);
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            setEditingCell(null);
+                          }
+                          e.stopPropagation();
+                        }}
+                        autoFocus
+                        className="h-full w-full border-none p-0 outline-none"
+                      />
+                    ) : (
+                      <span>{cellData.displayValue}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
-
-        {Array.from({ length: ROW_COUNT }).map((_, row) => (
-          <div
-            key={`row-${row}`}
-            className="flex"
-            style={{ height: ROW_HEIGHT }}
-          >
-            <div
-              className={cn(
-                "sticky left-0 z-10 flex items-center justify-center border border-gray-300 text-center font-bold",
-                row === selectedCellInfo.rowIndex ? "bg-blue-200" : "",
-              )}
-              style={{ width: "50px", minWidth: "50px", height: ROW_HEIGHT }}
-            >
-              {row + 1}
-            </div>
-
-            {columnHeaders.map((colHeader) => {
-              const cellId = `${colHeader}${row + 1}`;
-              const cellData = getCellData(cellId);
-              const isSelected = cellId === selectedCell;
-              const isEditing = cellId === editingCell;
-
-              return (
-                <div
-                  key={`cell-${cellId}`}
-                  className={cn(
-                    "overflow-hidden border px-1 text-ellipsis whitespace-nowrap",
-                    isSelected
-                      ? "box-border border-2 border-blue-500"
-                      : "border-gray-200",
-                    cellData.isFormula ? "text-green-700" : "",
-                  )}
-                  style={{
-                    width: COL_WIDTH,
-                    minWidth: COL_WIDTH,
-                    height: ROW_HEIGHT,
-                    flexShrink: 0,
-                  }}
-                  onClick={() => handleCellSelect(cellId)}
-                  onDoubleClick={() => handleCellDoubleClick(cellId)}
-                >
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => handleCellChange(e.target.value)}
-                      onBlur={() => handleCellEditComplete(cellId, editValue)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleCellEditComplete(cellId, editValue);
-                        } else if (e.key === "Escape") {
-                          e.preventDefault();
-                          setEditingCell(null);
-                        }
-                        e.stopPropagation();
-                      }}
-                      autoFocus
-                      className="h-full w-full border-none p-0 outline-none"
-                    />
-                  ) : (
-                    <span>{cellData.displayValue}</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
       </div>
-    </div>
+    </>
   );
 };
 
