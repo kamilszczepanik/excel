@@ -7,21 +7,14 @@ interface CellData {
   displayValue: string;
 }
 
-interface ExcelGridProps {
-  rowCount?: number;
-  colCount?: number;
-  defaultRowHeight?: string;
-  defaultColWidth?: string;
-}
+const ROW_COL_WIDTH = "w-20";
+const ROW_COL_MIN_WIDTH = "min-w-20";
+const COL_HEADER_WIDTH = "w-20";
+const COL_HEADER_MIN_WIDTH = "min-w-20";
+const ROW_COUNT = 100;
+const COL_COUNT = 26;
 
-const ROW_HEADER_WIDTH = "w-12";
-
-const ExcelGrid: React.FC<ExcelGridProps> = ({
-  rowCount = 100,
-  colCount = 26,
-  defaultRowHeight = "h-8",
-  defaultColWidth = "w-12",
-}) => {
+const ExcelGrid: React.FC = () => {
   const [visibleRows, setVisibleRows] = useState({
     start: 0,
     end: 30,
@@ -38,11 +31,11 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
 
   const columnHeaders = useMemo(() => {
     const headers = [];
-    for (let i = 0; i < colCount; i++) {
+    for (let i = 0; i < COL_COUNT; i++) {
       headers.push(getColumnLabel(i));
     }
     return headers;
-  }, [colCount]);
+  }, [COL_COUNT]);
 
   function getColumnLabel(colIndex: number): string {
     let label = "";
@@ -115,7 +108,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
           e.preventDefault();
           break;
         case "ArrowDown":
-          if (currentRow < rowCount - 1) {
+          if (currentRow < ROW_COUNT - 1) {
             setSelectedCell(`${colLabel}${currentRow + 2}`);
           }
           e.preventDefault();
@@ -129,7 +122,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
           e.preventDefault();
           break;
         case "ArrowRight":
-          if (currentCol < colCount - 1) {
+          if (currentCol < COL_COUNT - 1) {
             setSelectedCell(
               `${columnHeaders[currentCol + 1]}${currentRow + 1}`,
             );
@@ -153,8 +146,6 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
       }
     },
     [
-      rowCount,
-      colCount,
       editValue,
       editingCell,
       selectedCell,
@@ -164,38 +155,37 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
     ],
   );
 
-  const handleScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLDivElement;
-      const scrollTop = target.scrollTop;
-      const scrollLeft = target.scrollLeft;
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    const scrollTop = target.scrollTop;
+    const scrollLeft = target.scrollLeft;
 
-      const startRow = Math.floor(scrollTop);
-      const visibleRowCount = Math.ceil(target.clientHeight);
-      const endRow = Math.min(startRow + visibleRowCount + 5, rowCount); // Add buffer
+    const startRow = Math.floor(scrollTop);
+    const visibleRowCount = Math.ceil(target.clientHeight);
+    const endRow = Math.min(startRow + visibleRowCount + 5, ROW_COUNT);
 
-      const startCol = Math.floor(scrollLeft);
-      const visibleColCount = Math.ceil(target.clientWidth);
-      const endCol = Math.min(startCol + visibleColCount + 2, colCount); // Add buffer
+    const startCol = Math.floor(scrollLeft);
+    const visibleColCount = Math.ceil(target.clientWidth);
+    const endCol = Math.min(startCol + visibleColCount + 2, COL_COUNT);
 
-      setVisibleRows({ start: startRow, end: endRow });
-      setVisibleCols({ start: startCol, end: endCol });
-    },
-    [rowCount, colCount],
-  );
+    setVisibleRows({ start: startRow, end: endRow });
+    setVisibleCols({ start: startCol, end: endCol });
+  }, []);
 
   return (
     <div
-      className="relative h-full w-full overflow-auto"
+      className="relative overflow-auto"
       onKeyDown={handleKeyDown}
       onScroll={handleScroll}
     >
       <div className="flex">
-        <div className={`${ROW_HEADER_WIDTH} sticky`} />
+        <div
+          className={`${COL_HEADER_WIDTH} ${COL_HEADER_MIN_WIDTH} sticky overflow-hidden`}
+        />
         {columnHeaders.slice(visibleCols.start, visibleCols.end).map((col) => (
           <div
             key={col}
-            className={`border-r border-b text-center font-bold ${defaultColWidth}`}
+            className={`text-center font-bold ${COL_HEADER_WIDTH}`}
           >
             {col}
           </div>
@@ -209,7 +199,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
             return (
               <div key={`row-${row}`} className="row flex">
                 <div
-                  className={`${ROW_HEADER_WIDTH} sticky left-0 z-[1] border-r border-b text-center font-bold`}
+                  className={`${ROW_COL_WIDTH} ${ROW_COL_MIN_WIDTH} sticky left-0 z-[1] text-center font-bold`}
                 >
                   {row + 1}
                 </div>
@@ -228,7 +218,7 @@ const ExcelGrid: React.FC<ExcelGridProps> = ({
                       <div
                         key={`cell-${cellId}`}
                         className={cn(
-                          `cell relative overflow-hidden border border-gray-200 px-1 text-ellipsis whitespace-nowrap ${defaultColWidth}`,
+                          `relative overflow-hidden border border-gray-200 px-1 text-ellipsis whitespace-nowrap ${ROW_COL_WIDTH} ${ROW_COL_MIN_WIDTH}`,
                           isSelected ? "outline-2 outline-blue-500" : "",
                         )}
                         onClick={() => handleCellSelect(cellId)}
