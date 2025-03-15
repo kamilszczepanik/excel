@@ -5,12 +5,30 @@ import React, { useState, useCallback, useMemo } from "react";
 interface CellData {
   value: string;
   displayValue: string;
+  isFormula?: boolean; // Track if cell contains a formula
 }
 
 const ROW_HEIGHT = 30;
 const COL_WIDTH = 80;
 const ROW_COUNT = 10;
 const COL_COUNT = 10;
+
+function evaluateFormula(formula: string): string {
+  try {
+    const expression = formula.substring(1).trim();
+
+    if (/[a-zA-Z$_]/.test(expression)) {
+      return "#ERROR: Only numbers and operators allowed";
+    }
+
+    const result = new Function(`return ${expression}`)();
+
+    return result.toString();
+  } catch (error) {
+    console.error("Formula evaluation error:", error);
+    return "#ERROR";
+  }
+}
 
 const ExcelGrid: React.FC = () => {
   const [cells, setCells] = useState<Map<string, CellData>>(new Map());
@@ -54,10 +72,20 @@ const ExcelGrid: React.FC = () => {
     (cellId: string, newValue: string) => {
       setCells((prevCells) => {
         const newCells = new Map(prevCells);
+
+        const isFormula = newValue.startsWith("=");
+        let displayValue = newValue;
+
+        if (isFormula) {
+          displayValue = evaluateFormula(newValue);
+        }
+
         newCells.set(cellId, {
           value: newValue,
-          displayValue: newValue,
+          displayValue: displayValue,
+          isFormula: isFormula,
         });
+
         return newCells;
       });
       setEditingCell(null);
@@ -132,8 +160,7 @@ const ExcelGrid: React.FC = () => {
   );
 
   const handleScroll = useCallback(() => {
-    // We don't need to calculate visible cells anymore since we're rendering them all
-    // Just keep the function for future optimizations
+    // todo: handle scroll
   }, []);
 
   return (
@@ -198,6 +225,7 @@ const ExcelGrid: React.FC = () => {
                     isSelected
                       ? "box-border border-2 border-blue-500"
                       : "border-gray-200",
+                    cellData.isFormula ? "text-green-700" : "",
                   )}
                   style={{
                     width: COL_WIDTH,
