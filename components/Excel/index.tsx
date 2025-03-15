@@ -18,7 +18,8 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import { Cell } from "./Cell";
+import { GridCell } from "./GridCell";
+import { ColumnHeaders } from "./ColumnHeaders";
 
 const Excel: React.FC = () => {
   const [cells, setCells] = useState<Cells>(new Map());
@@ -446,29 +447,14 @@ const Excel: React.FC = () => {
               height: ROW_HEIGHT,
             }}
           />
-
-          <div className="sticky top-0 z-20 -mt-12 flex">
-            {visibleColumnHeaders.map((col, index) => (
-              <div
-                key={col}
-                className={cn(
-                  "flex items-center justify-center border border-gray-300 bg-gray-100 text-center font-bold",
-                  col === selectedCellInfo.colLabel ? "bg-blue-200" : "",
-                )}
-                style={{
-                  width: COL_WIDTH,
-                  minWidth: COL_WIDTH,
-                  height: ROW_HEIGHT,
-                  position: "absolute",
-                  left: 50 + (index + visibleRange.startCol) * COL_WIDTH,
-                  top: 0,
-                  zIndex: 10,
-                }}
-              >
-                {col}
-              </div>
-            ))}
-          </div>
+          <ColumnHeaders
+            visibleColumnHeaders={visibleColumnHeaders}
+            colLabel={selectedCellInfo.colLabel}
+            visibleRange={{
+              startCol: visibleRange.startCol,
+              endCol: visibleRange.endCol,
+            }}
+          />
           {Array.from({
             length: visibleRange.endRow - visibleRange.startRow + 1,
           }).map((_, rowIndex) => {
@@ -513,7 +499,7 @@ const Excel: React.FC = () => {
                   const cellId = `${colHeader}${row + 1}`;
 
                   return (
-                    <Cell
+                    <GridCell
                       key={cellId}
                       cellId={cellId}
                       getCellData={getCellData}

@@ -26,7 +26,7 @@ interface Props {
   setEditValue: (value: string) => void;
 }
 
-export const Cell: React.FC<Props> = ({
+export const GridCell: React.FC<Props> = ({
   cellId,
   getCellData,
   selectedCell,
