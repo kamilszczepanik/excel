@@ -194,8 +194,10 @@ const ExcelGrid: React.FC = () => {
                 <div
                   key={`cell-${cellId}`}
                   className={cn(
-                    "overflow-hidden border border-gray-200 px-1 text-ellipsis whitespace-nowrap",
-                    isSelected ? "outline-2 outline-blue-500" : "",
+                    "overflow-hidden border px-1 text-ellipsis whitespace-nowrap",
+                    isSelected
+                      ? "box-border border-2 border-blue-500"
+                      : "border-gray-200",
                   )}
                   style={{
                     width: COL_WIDTH,
