@@ -163,6 +163,18 @@ const ExcelGrid: React.FC = () => {
     // todo: handle scroll
   }, []);
 
+  const selectedCellInfo = useMemo(() => {
+    if (!selectedCell) return { rowIndex: -1, colLabel: "" };
+    const match = selectedCell.match(/([A-Z]+)(\d+)/);
+    if (!match) return { rowIndex: -1, colLabel: "" };
+    const [, colLabel, rowNum] = match;
+
+    return {
+      rowIndex: parseInt(rowNum) - 1,
+      colLabel,
+    };
+  }, [selectedCell]);
+
   return (
     <div
       className="relative h-screen w-full overflow-auto"
@@ -185,7 +197,10 @@ const ExcelGrid: React.FC = () => {
           {columnHeaders.map((col) => (
             <div
               key={col}
-              className="flex items-center justify-center border border-gray-300 text-center font-bold"
+              className={cn(
+                "flex items-center justify-center border border-gray-300 text-center font-bold",
+                col === selectedCellInfo.colLabel ? "bg-blue-200" : "",
+              )}
               style={{
                 width: COL_WIDTH,
                 minWidth: COL_WIDTH,
@@ -205,7 +220,10 @@ const ExcelGrid: React.FC = () => {
             style={{ height: ROW_HEIGHT }}
           >
             <div
-              className="sticky left-0 z-10 flex items-center justify-center border border-gray-300 bg-gray-100 text-center font-bold"
+              className={cn(
+                "sticky left-0 z-10 flex items-center justify-center border border-gray-300 text-center font-bold",
+                row === selectedCellInfo.rowIndex ? "bg-blue-200" : "",
+              )}
               style={{ width: "50px", minWidth: "50px", height: ROW_HEIGHT }}
             >
               {row + 1}
