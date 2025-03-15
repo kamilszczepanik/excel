@@ -401,6 +401,108 @@ const Excel: React.FC = () => {
     };
   }, [handleScroll]);
 
+  const gridCellProps = useMemo(
+    () => ({
+      getCellData,
+      selectedCell,
+      editingCell,
+      handleCellSelect,
+      handleCellDoubleClick,
+      isEditingFormulaBar,
+      editValue,
+      handleCellChange,
+      isFormulaBarFocused,
+      handleCellEditComplete,
+      setEditingCell,
+      setIsEditingFormulaBar,
+      setEditValue,
+    }),
+    [
+      getCellData,
+      selectedCell,
+      editingCell,
+      handleCellSelect,
+      handleCellDoubleClick,
+      isEditingFormulaBar,
+      editValue,
+      handleCellChange,
+      isFormulaBarFocused,
+      handleCellEditComplete,
+      setEditingCell,
+      setIsEditingFormulaBar,
+      setEditValue,
+    ],
+  );
+
+  const renderedRows = useMemo(() => {
+    return Array.from({
+      length: visibleRange.endRow - visibleRange.startRow + 1,
+    }).map((_, rowIndex) => {
+      const row = visibleRange.startRow + rowIndex;
+
+      return (
+        <div
+          key={`row-${row}`}
+          style={{
+            height: ROW_HEIGHT,
+            position: "absolute",
+            top: (row + 1) * ROW_HEIGHT,
+            left: 0,
+            right: 0,
+            width: "100%",
+          }}
+        >
+          <div
+            className={cn(
+              "sticky flex items-center justify-center border border-gray-300 bg-gray-100 text-center font-bold",
+              row === selectedCellInfo.rowIndex ? "bg-blue-200" : "",
+            )}
+            style={{
+              width: "50px",
+              minWidth: "50px",
+              height: ROW_HEIGHT,
+              left: scrollContainerRef.current
+                ? scrollContainerRef.current.getBoundingClientRect().left
+                : 0,
+              top:
+                (row + 1) * ROW_HEIGHT -
+                (scrollContainerRef.current
+                  ? scrollContainerRef.current.scrollTop
+                  : 0),
+              zIndex: 30,
+            }}
+          >
+            {row + 1}
+          </div>
+
+          {visibleColumnHeaders.map((colHeader, colIndex) => {
+            const cellId = `${colHeader}${row + 1}`;
+
+            return (
+              <GridCell
+                key={cellId}
+                cellId={cellId}
+                colIndex={colIndex}
+                visibleRange={visibleRange}
+                {...gridCellProps}
+              />
+            );
+          })}
+        </div>
+      );
+    });
+  }, [
+    visibleRange.startRow,
+    visibleRange.endRow,
+    visibleRange.startCol,
+    visibleRange.endCol,
+    visibleColumnHeaders,
+    selectedCellInfo.rowIndex,
+    gridCellProps,
+    scrollContainerRef.current?.getBoundingClientRect().left,
+    scrollContainerRef.current?.scrollTop,
+  ]);
+
   return (
     <div className="flex h-screen flex-col">
       <FormulaBar
@@ -445,74 +547,7 @@ const Excel: React.FC = () => {
               endCol: visibleRange.endCol,
             }}
           />
-          {Array.from({
-            length: visibleRange.endRow - visibleRange.startRow + 1,
-          }).map((_, rowIndex) => {
-            const row = visibleRange.startRow + rowIndex;
-
-            return (
-              <div
-                key={`row-${row}`}
-                style={{
-                  height: ROW_HEIGHT,
-                  position: "absolute",
-                  top: (row + 1) * ROW_HEIGHT,
-                  left: 0,
-                  right: 0,
-                  width: "100%",
-                }}
-              >
-                <div
-                  className={cn(
-                    "sticky flex items-center justify-center border border-gray-300 bg-gray-100 text-center font-bold",
-                    row === selectedCellInfo.rowIndex ? "bg-blue-200" : "",
-                  )}
-                  style={{
-                    width: "50px",
-                    minWidth: "50px",
-                    height: ROW_HEIGHT,
-                    left: scrollContainerRef.current
-                      ? scrollContainerRef.current.getBoundingClientRect().left
-                      : 0,
-                    top:
-                      (row + 1) * ROW_HEIGHT -
-                      (scrollContainerRef.current
-                        ? scrollContainerRef.current.scrollTop
-                        : 0),
-                    zIndex: 30,
-                  }}
-                >
-                  {row + 1}
-                </div>
-
-                {visibleColumnHeaders.map((colHeader, colIndex) => {
-                  const cellId = `${colHeader}${row + 1}`;
-
-                  return (
-                    <GridCell
-                      key={cellId}
-                      cellId={cellId}
-                      getCellData={getCellData}
-                      selectedCell={selectedCell}
-                      editingCell={editingCell}
-                      visibleRange={visibleRange}
-                      colIndex={colIndex}
-                      handleCellSelect={handleCellSelect}
-                      handleCellDoubleClick={handleCellDoubleClick}
-                      isEditingFormulaBar={isEditingFormulaBar}
-                      editValue={editValue}
-                      handleCellChange={handleCellChange}
-                      isFormulaBarFocused={isFormulaBarFocused}
-                      handleCellEditComplete={handleCellEditComplete}
-                      setEditingCell={setEditingCell}
-                      setIsEditingFormulaBar={setIsEditingFormulaBar}
-                      setEditValue={setEditValue}
-                    />
-                  );
-                })}
-              </div>
-            );
-          })}
+          {renderedRows}
         </div>
       </div>
     </div>

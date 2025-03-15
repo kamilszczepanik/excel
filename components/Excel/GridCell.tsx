@@ -1,6 +1,7 @@
 import { CellData } from "@/types";
 import { cn, evaluateFormula } from "@/utils";
 import { COL_WIDTH, ROW_HEIGHT } from "@/utils/constants";
+import React, { memo } from "react";
 
 interface Props {
   cellId: string;
@@ -26,7 +27,37 @@ interface Props {
   setEditValue: (value: string) => void;
 }
 
-export const GridCell: React.FC<Props> = ({
+function arePropsEqual(prevProps: Props, nextProps: Props) {
+  if (
+    nextProps.cellId === nextProps.selectedCell ||
+    nextProps.cellId === nextProps.editingCell ||
+    prevProps.cellId === prevProps.selectedCell ||
+    prevProps.cellId === prevProps.editingCell
+  ) {
+    return false;
+  }
+
+  const prevCellData = prevProps.getCellData(prevProps.cellId);
+  const nextCellData = nextProps.getCellData(nextProps.cellId);
+
+  if (
+    prevCellData.value !== nextCellData.value ||
+    prevCellData.displayValue !== nextCellData.displayValue
+  ) {
+    return false;
+  }
+
+  if (
+    prevProps.colIndex !== nextProps.colIndex ||
+    prevProps.visibleRange.startCol !== nextProps.visibleRange.startCol
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+const GridCellComponent = ({
   cellId,
   getCellData,
   selectedCell,
@@ -51,7 +82,6 @@ export const GridCell: React.FC<Props> = ({
 
   return (
     <div
-      key={`cell-${cellId}`}
       className={cn(
         "overflow-hidden border px-1 text-ellipsis whitespace-nowrap",
         isSelected ? "box-border border-2 border-blue-500" : "border-gray-200",
@@ -112,3 +142,7 @@ export const GridCell: React.FC<Props> = ({
     </div>
   );
 };
+
+export const GridCell = memo(GridCellComponent, arePropsEqual);
+
+GridCell.displayName = "GridCell";
