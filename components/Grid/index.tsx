@@ -17,8 +17,9 @@ interface CellData {
 
 const ROW_HEIGHT = 30;
 const COL_WIDTH = 80;
-const ROW_COUNT = 50;
-const COL_COUNT = 10;
+const ROW_COUNT = 10000;
+const COL_COUNT = 10000;
+const BUFFER_SIZE = 5;
 
 function evaluateFormula(
   formula: string,
@@ -111,6 +112,14 @@ const ExcelGrid: React.FC = () => {
   >(new Map());
 
   const gridContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const [visibleRange, setVisibleRange] = useState({
+    startRow: 0,
+    endRow: 50,
+    startCol: 0,
+    endCol: 25,
+  });
 
   const columnHeaders = useMemo(() => {
     const headers = [];
@@ -317,32 +326,57 @@ const ExcelGrid: React.FC = () => {
       const currentCol = columnHeaders.indexOf(colLabel);
       const currentRow = parseInt(rowLabel) - 1;
 
+      const ensureCellVisible = (row: number, col: number) => {
+        if (!scrollContainerRef.current) return;
+
+        const colLabel = getColumnLabel(col);
+        const cellId = `${colLabel}${row + 1}`;
+
+        setSelectedCell(cellId);
+
+        const cellTop = (row + 1) * ROW_HEIGHT;
+        const cellLeft = 50 + col * COL_WIDTH;
+
+        const { offsetWidth, offsetHeight, scrollLeft, scrollTop } =
+          scrollContainerRef.current;
+
+        if (cellLeft < scrollLeft + 50) {
+          scrollContainerRef.current.scrollLeft = cellLeft - 50;
+        } else if (cellLeft + COL_WIDTH > scrollLeft + offsetWidth) {
+          scrollContainerRef.current.scrollLeft =
+            cellLeft + COL_WIDTH - offsetWidth;
+        }
+
+        if (cellTop < scrollTop + ROW_HEIGHT) {
+          scrollContainerRef.current.scrollTop = cellTop - ROW_HEIGHT;
+        } else if (cellTop + ROW_HEIGHT > scrollTop + offsetHeight) {
+          scrollContainerRef.current.scrollTop =
+            cellTop + ROW_HEIGHT - offsetHeight;
+        }
+      };
+
       switch (e.key) {
         case "ArrowUp":
           if (currentRow > 0) {
-            setSelectedCell(`${colLabel}${currentRow}`);
+            ensureCellVisible(currentRow - 1, currentCol);
           }
           e.preventDefault();
           break;
         case "ArrowDown":
           if (currentRow < ROW_COUNT - 1) {
-            setSelectedCell(`${colLabel}${currentRow + 2}`);
+            ensureCellVisible(currentRow + 1, currentCol);
           }
           e.preventDefault();
           break;
         case "ArrowLeft":
           if (currentCol > 0) {
-            setSelectedCell(
-              `${columnHeaders[currentCol - 1]}${currentRow + 1}`,
-            );
+            ensureCellVisible(currentRow, currentCol - 1);
           }
           e.preventDefault();
           break;
         case "ArrowRight":
           if (currentCol < COL_COUNT - 1) {
-            setSelectedCell(
-              `${columnHeaders[currentCol + 1]}${currentRow + 1}`,
-            );
+            ensureCellVisible(currentRow, currentCol + 1);
           }
           e.preventDefault();
           break;
@@ -386,7 +420,29 @@ const ExcelGrid: React.FC = () => {
   );
 
   const handleScroll = useCallback(() => {
-    // todo: handle scroll
+    if (!scrollContainerRef.current) return;
+
+    const { scrollTop, scrollLeft, clientHeight, clientWidth } =
+      scrollContainerRef.current;
+
+    const startRow = Math.floor(scrollTop / ROW_HEIGHT);
+    const endRow = Math.min(
+      Math.ceil((scrollTop + clientHeight) / ROW_HEIGHT) + BUFFER_SIZE,
+      ROW_COUNT - 1,
+    );
+
+    const startCol = Math.floor(scrollLeft / COL_WIDTH);
+    const endCol = Math.min(
+      Math.ceil((scrollLeft + clientWidth) / COL_WIDTH) + BUFFER_SIZE,
+      COL_COUNT - 1,
+    );
+
+    setVisibleRange({
+      startRow: Math.max(0, startRow - BUFFER_SIZE),
+      endRow,
+      startCol: Math.max(0, startCol - BUFFER_SIZE),
+      endCol,
+    });
   }, []);
 
   const selectedCellInfo = useMemo(() => {
@@ -400,6 +456,29 @@ const ExcelGrid: React.FC = () => {
       colLabel,
     };
   }, [selectedCell]);
+
+  const visibleColumnHeaders = useMemo(() => {
+    const headers = [];
+    for (let i = visibleRange.startCol; i <= visibleRange.endCol; i++) {
+      if (i < COL_COUNT) {
+        headers.push(getColumnLabel(i));
+      }
+    }
+    return headers;
+  }, [visibleRange.startCol, visibleRange.endCol]);
+
+  useEffect(() => {
+    handleScroll();
+
+    const handleResize = () => {
+      handleScroll();
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [handleScroll]);
 
   return (
     <div className="flex h-screen flex-col">
@@ -424,7 +503,10 @@ const ExcelGrid: React.FC = () => {
         />
       </div>
       <div
-        ref={gridContainerRef}
+        ref={(el) => {
+          gridContainerRef.current = el;
+          scrollContainerRef.current = el;
+        }}
         className="flex-1 overflow-auto outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
@@ -434,125 +516,155 @@ const ExcelGrid: React.FC = () => {
           style={{
             width: COL_COUNT * COL_WIDTH + 50,
             height: ROW_COUNT * ROW_HEIGHT + ROW_HEIGHT,
+            position: "relative",
           }}
         >
-          <div className="sticky top-0 z-10 flex bg-gray-100">
-            <div
-              className="sticky left-0 z-20 border border-gray-300 bg-gray-200"
-              style={{
-                width: COL_WIDTH,
-                minWidth: "50px",
-                height: ROW_HEIGHT,
-                zIndex: 50,
-              }}
-            />
+          <div
+            className="sticky top-0 left-0 z-[100] border border-gray-300 bg-gray-200"
+            style={{
+              width: "50px",
+              minWidth: "50px",
+              height: ROW_HEIGHT,
+            }}
+          />
 
-            {columnHeaders.map((col) => (
+          <div className="sticky top-0 z-20 -mt-12 flex">
+            {visibleColumnHeaders.map((col, index) => (
               <div
                 key={col}
                 className={cn(
-                  "flex items-center justify-center border border-gray-300 text-center font-bold",
+                  "flex items-center justify-center border border-gray-300 bg-gray-100 text-center font-bold",
                   col === selectedCellInfo.colLabel ? "bg-blue-200" : "",
                 )}
                 style={{
                   width: COL_WIDTH,
                   minWidth: COL_WIDTH,
                   height: ROW_HEIGHT,
-                  flexShrink: 0,
+                  position: "absolute",
+                  left: 50 + (index + visibleRange.startCol) * COL_WIDTH,
+                  top: 0,
+                  zIndex: 10,
                 }}
               >
                 {col}
               </div>
             ))}
           </div>
+          {Array.from({
+            length: visibleRange.endRow - visibleRange.startRow + 1,
+          }).map((_, rowIndex) => {
+            const row = visibleRange.startRow + rowIndex;
 
-          {Array.from({ length: ROW_COUNT }).map((_, row) => (
-            <div
-              key={`row-${row}`}
-              className="flex"
-              style={{ height: ROW_HEIGHT }}
-            >
+            return (
               <div
-                className={cn(
-                  "sticky left-0 z-10 flex items-center justify-center border border-gray-300 text-center font-bold",
-                  row === selectedCellInfo.rowIndex ? "bg-blue-200" : "",
-                )}
-                style={{ width: "50px", minWidth: "50px", height: ROW_HEIGHT }}
+                key={`row-${row}`}
+                style={{
+                  height: ROW_HEIGHT,
+                  position: "absolute",
+                  top: (row + 1) * ROW_HEIGHT,
+                  left: 0,
+                  right: 0,
+                  width: "100%",
+                }}
               >
-                {row + 1}
+                <div
+                  className={cn(
+                    "sticky flex items-center justify-center border border-gray-300 bg-gray-100 text-center font-bold",
+                    row === selectedCellInfo.rowIndex ? "bg-blue-200" : "",
+                  )}
+                  style={{
+                    width: "50px",
+                    minWidth: "50px",
+                    height: ROW_HEIGHT,
+                    left: scrollContainerRef.current
+                      ? scrollContainerRef.current.getBoundingClientRect().left
+                      : 0,
+                    top:
+                      (row + 1) * ROW_HEIGHT -
+                      (scrollContainerRef.current
+                        ? scrollContainerRef.current.scrollTop
+                        : 0),
+                    zIndex: 30,
+                  }}
+                >
+                  {row + 1}
+                </div>
+
+                {visibleColumnHeaders.map((colHeader, colIndex) => {
+                  const cellId = `${colHeader}${row + 1}`;
+                  const cellData = getCellData(cellId);
+                  const isSelected = cellId === selectedCell;
+                  const isEditing = cellId === editingCell;
+                  const colPosition = visibleRange.startCol + colIndex;
+
+                  return (
+                    <div
+                      key={`cell-${cellId}`}
+                      className={cn(
+                        "overflow-hidden border px-1 text-ellipsis whitespace-nowrap",
+                        isSelected
+                          ? "box-border border-2 border-blue-500"
+                          : "border-gray-200",
+                        cellData.isFormula ? "text-yellow-700" : "",
+                      )}
+                      style={{
+                        width: COL_WIDTH,
+                        minWidth: COL_WIDTH,
+                        height: ROW_HEIGHT,
+                        position: "absolute",
+                        left: 50 + colPosition * COL_WIDTH,
+                        top: 0,
+                      }}
+                      onClick={() => handleCellSelect(cellId)}
+                      onDoubleClick={() => handleCellDoubleClick(cellId)}
+                    >
+                      {isEditing || (isSelected && isEditingFormulaBar) ? (
+                        <input
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => handleCellChange(e.target.value)}
+                          onBlur={() => {
+                            if (!isFormulaBarFocused) {
+                              handleCellEditComplete(cellId, editValue);
+                              setEditingCell(null);
+                              setIsEditingFormulaBar(false);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleCellEditComplete(cellId, editValue);
+                              setEditingCell(null);
+                              setIsEditingFormulaBar(false);
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              setEditingCell(null);
+                              setIsEditingFormulaBar(false);
+                              setEditValue(getCellData(cellId).value);
+                            }
+                            e.stopPropagation();
+                          }}
+                          autoFocus={isEditing}
+                          className="h-full w-full border-none p-0 outline-none"
+                        />
+                      ) : (
+                        <span>
+                          {isSelected && isFormulaBarFocused
+                            ? editValue.startsWith("=")
+                              ? evaluateFormula(
+                                  editValue,
+                                  (cellId) => getCellData(cellId).value,
+                                )
+                              : editValue
+                            : cellData.displayValue}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-
-              {columnHeaders.map((colHeader) => {
-                const cellId = `${colHeader}${row + 1}`;
-                const cellData = getCellData(cellId);
-                const isSelected = cellId === selectedCell;
-                const isEditing = cellId === editingCell;
-
-                return (
-                  <div
-                    key={`cell-${cellId}`}
-                    className={cn(
-                      "overflow-hidden border px-1 text-ellipsis whitespace-nowrap",
-                      isSelected
-                        ? "box-border border-2 border-blue-500"
-                        : "border-gray-200",
-                      cellData.isFormula ? "text-yellow-700" : "",
-                    )}
-                    style={{
-                      width: COL_WIDTH,
-                      minWidth: COL_WIDTH,
-                      height: ROW_HEIGHT,
-                      flexShrink: 0,
-                    }}
-                    onClick={() => handleCellSelect(cellId)}
-                    onDoubleClick={() => handleCellDoubleClick(cellId)}
-                  >
-                    {isEditing || (isSelected && isEditingFormulaBar) ? (
-                      <input
-                        type="text"
-                        value={editValue}
-                        onChange={(e) => handleCellChange(e.target.value)}
-                        onBlur={() => {
-                          if (!isFormulaBarFocused) {
-                            handleCellEditComplete(cellId, editValue);
-                            setEditingCell(null);
-                            setIsEditingFormulaBar(false);
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleCellEditComplete(cellId, editValue);
-                            setEditingCell(null);
-                            setIsEditingFormulaBar(false);
-                          } else if (e.key === "Escape") {
-                            e.preventDefault();
-                            setEditingCell(null);
-                            setIsEditingFormulaBar(false);
-                            setEditValue(getCellData(cellId).value);
-                          }
-                          e.stopPropagation();
-                        }}
-                        autoFocus={isEditing}
-                        className="h-full w-full border-none p-0 outline-none"
-                      />
-                    ) : (
-                      <span>
-                        {isSelected && isFormulaBarFocused
-                          ? editValue.startsWith("=")
-                            ? evaluateFormula(
-                                editValue,
-                                (cellId) => getCellData(cellId).value,
-                              )
-                            : editValue
-                          : cellData.displayValue}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
