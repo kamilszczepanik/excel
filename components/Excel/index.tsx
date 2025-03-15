@@ -20,6 +20,7 @@ import React, {
 } from "react";
 import { GridCell } from "./GridCell";
 import { ColumnHeaders } from "./ColumnHeaders";
+import { FormulaBar } from "./FormulaBar";
 
 const Excel: React.FC = () => {
   const [cells, setCells] = useState<Cells>(new Map());
@@ -402,26 +403,15 @@ const Excel: React.FC = () => {
 
   return (
     <div className="flex h-screen flex-col">
-      <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-gray-300 bg-white p-2">
-        <div className="w-12 text-center font-medium">
-          {selectedCell || "No cell selected"}
-        </div>
-        <input
-          type="text"
-          value={editValue}
-          onChange={(e) => handleCellChange(e.target.value)}
-          onKeyDown={handleFormulaBarKeyDown}
-          onFocus={handleFormulaBarFocus}
-          onBlur={handleFormulaBarBlur}
-          placeholder="Enter formula or value..."
-          className="flex-1 rounded px-2 py-1"
-          style={{ minWidth: COL_WIDTH * 3 }}
-          onClick={() =>
-            selectedCell && handleEditFormulaBar(selectedCell.toString())
-          }
-          disabled={!selectedCell}
-        />
-      </div>
+      <FormulaBar
+        selectedCell={selectedCell}
+        editValue={editValue}
+        handleCellChange={handleCellChange}
+        handleFormulaBarKeyDown={handleFormulaBarKeyDown}
+        handleFormulaBarFocus={handleFormulaBarFocus}
+        handleFormulaBarBlur={handleFormulaBarBlur}
+        handleEditFormulaBar={handleEditFormulaBar}
+      />
       <div
         ref={(el) => {
           gridContainerRef.current = el;
