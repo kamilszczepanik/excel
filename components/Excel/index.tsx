@@ -1,5 +1,5 @@
 "use client";
-import { CellData, Cells } from "@/types";
+import { CellData, Cells, DependentCells } from "@/types";
 import { cn, evaluateFormula, getColumnLabel } from "@/utils";
 import {
   BUFFER_SIZE,
@@ -8,6 +8,8 @@ import {
   DEFAULT_CELL,
   ROW_COUNT,
   ROW_HEIGHT,
+  VISIBLE_COL_COUNT,
+  VISIBLE_ROW_COUNT,
 } from "@/utils/constants";
 import React, {
   useState,
@@ -16,27 +18,28 @@ import React, {
   useEffect,
   useRef,
 } from "react";
+import { Cell } from "./Cell";
 
-const ExcelGrid: React.FC = () => {
+const Excel: React.FC = () => {
   const [cells, setCells] = useState<Cells>(new Map());
   const [selectedCell, setSelectedCell] = useState<string | null>(DEFAULT_CELL);
   const [editingCell, setEditingCell] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [isFormulaBarFocused, setIsFormulaBarFocused] = useState(false);
-  const [isEditingFormulaBar, setIsEditingFormulaBar] = useState(false);
-  const [dependentCells, setDependentCells] = useState<
-    Map<string, Set<string>>
-  >(new Map());
-
-  const gridContainerRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
+  const [editValue, setEditValue] = useState<string>("");
+  const [isFormulaBarFocused, setIsFormulaBarFocused] =
+    useState<boolean>(false);
+  const [isEditingFormulaBar, setIsEditingFormulaBar] =
+    useState<boolean>(false);
+  const [dependentCells, setDependentCells] = useState<DependentCells>(
+    new Map(),
+  );
   const [visibleRange, setVisibleRange] = useState({
     startRow: 0,
-    endRow: 50,
+    endRow: VISIBLE_ROW_COUNT,
     startCol: 0,
-    endCol: 25,
+    endCol: VISIBLE_COL_COUNT,
   });
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const columnHeaders = useMemo(() => {
     const headers = [];
@@ -47,9 +50,8 @@ const ExcelGrid: React.FC = () => {
   }, []);
 
   const getCellData = useCallback(
-    (cellId: string): CellData => {
-      return cells.get(cellId) || { value: "", displayValue: "" };
-    },
+    (cellId: string): CellData =>
+      cells.get(cellId) || { value: "", displayValue: "" },
     [cells],
   );
 
@@ -509,74 +511,27 @@ const ExcelGrid: React.FC = () => {
 
                 {visibleColumnHeaders.map((colHeader, colIndex) => {
                   const cellId = `${colHeader}${row + 1}`;
-                  const cellData = getCellData(cellId);
-                  const isSelected = cellId === selectedCell;
-                  const isEditing = cellId === editingCell;
-                  const colPosition = visibleRange.startCol + colIndex;
 
                   return (
-                    <div
-                      key={`cell-${cellId}`}
-                      className={cn(
-                        "overflow-hidden border px-1 text-ellipsis whitespace-nowrap",
-                        isSelected
-                          ? "box-border border-2 border-blue-500"
-                          : "border-gray-200",
-                        cellData.isFormula ? "text-yellow-700" : "",
-                      )}
-                      style={{
-                        width: COL_WIDTH,
-                        minWidth: COL_WIDTH,
-                        height: ROW_HEIGHT,
-                        position: "absolute",
-                        left: 50 + colPosition * COL_WIDTH,
-                        top: 0,
-                      }}
-                      onClick={() => handleCellSelect(cellId)}
-                      onDoubleClick={() => handleCellDoubleClick(cellId)}
-                    >
-                      {isEditing || (isSelected && isEditingFormulaBar) ? (
-                        <input
-                          type="text"
-                          value={editValue}
-                          onChange={(e) => handleCellChange(e.target.value)}
-                          onBlur={() => {
-                            if (!isFormulaBarFocused) {
-                              handleCellEditComplete(cellId, editValue);
-                              setEditingCell(null);
-                              setIsEditingFormulaBar(false);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleCellEditComplete(cellId, editValue);
-                              setEditingCell(null);
-                              setIsEditingFormulaBar(false);
-                            } else if (e.key === "Escape") {
-                              e.preventDefault();
-                              setEditingCell(null);
-                              setIsEditingFormulaBar(false);
-                              setEditValue(getCellData(cellId).value);
-                            }
-                            e.stopPropagation();
-                          }}
-                          autoFocus={isEditing}
-                          className="h-full w-full border-none p-0 outline-none"
-                        />
-                      ) : (
-                        <span>
-                          {isSelected && isFormulaBarFocused
-                            ? editValue.startsWith("=")
-                              ? evaluateFormula(
-                                  editValue,
-                                  (cellId) => getCellData(cellId).value,
-                                )
-                              : editValue
-                            : cellData.displayValue}
-                        </span>
-                      )}
-                    </div>
+                    <Cell
+                      key={cellId}
+                      cellId={cellId}
+                      getCellData={getCellData}
+                      selectedCell={selectedCell}
+                      editingCell={editingCell}
+                      visibleRange={visibleRange}
+                      colIndex={colIndex}
+                      handleCellSelect={handleCellSelect}
+                      handleCellDoubleClick={handleCellDoubleClick}
+                      isEditingFormulaBar={isEditingFormulaBar}
+                      editValue={editValue}
+                      handleCellChange={handleCellChange}
+                      isFormulaBarFocused={isFormulaBarFocused}
+                      handleCellEditComplete={handleCellEditComplete}
+                      setEditingCell={setEditingCell}
+                      setIsEditingFormulaBar={setIsEditingFormulaBar}
+                      setEditValue={setEditValue}
+                    />
                   );
                 })}
               </div>
@@ -588,4 +543,4 @@ const ExcelGrid: React.FC = () => {
   );
 };
 
-export default ExcelGrid;
+export default Excel;

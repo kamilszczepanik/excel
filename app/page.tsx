@@ -1,4 +1,4 @@
-import ExcelGrid from "@/components/Grid";
+import ExcelGrid from "@/components/Excel";
 
 export default function Home() {
   return (

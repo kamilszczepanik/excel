@@ -6,3 +6,5 @@ export interface CellData {
 }
 
 export type Cells = Map<string, CellData>;
+
+export type DependentCells = Map<string, Set<string>>;
