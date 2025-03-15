@@ -1,5 +1,5 @@
 "use client";
-import { cn } from "@/utils";
+import { cn, getColumnLabel } from "@/utils";
 import React, { useState, useCallback, useMemo } from "react";
 
 interface CellData {
@@ -7,23 +7,12 @@ interface CellData {
   displayValue: string;
 }
 
-const ROW_COL_WIDTH = "w-20";
-const ROW_COL_MIN_WIDTH = "min-w-20";
-const COL_HEADER_WIDTH = "w-20";
-const COL_HEADER_MIN_WIDTH = "min-w-20";
-const ROW_COUNT = 100;
-const COL_COUNT = 26;
+const ROW_HEIGHT = 30;
+const COL_WIDTH = 80;
+const ROW_COUNT = 10;
+const COL_COUNT = 10;
 
 const ExcelGrid: React.FC = () => {
-  const [visibleRows, setVisibleRows] = useState({
-    start: 0,
-    end: 30,
-  });
-  const [visibleCols, setVisibleCols] = useState({
-    start: 0,
-    end: 15,
-  });
-
   const [cells, setCells] = useState<Map<string, CellData>>(new Map());
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<string | null>(null);
@@ -35,27 +24,14 @@ const ExcelGrid: React.FC = () => {
       headers.push(getColumnLabel(i));
     }
     return headers;
-  }, [COL_COUNT]);
+  }, []);
 
-  function getColumnLabel(colIndex: number): string {
-    let label = "";
-    let col = colIndex;
-
-    while (col >= 0) {
-      label = String.fromCharCode("A".charCodeAt(0) + (col % 26)) + label;
-      col = Math.floor(col / 26) - 1;
-    }
-
-    return label;
-  }
-
-  function getCellId(row: number, col: number): string {
-    return `${getColumnLabel(col)}${row + 1}`;
-  }
-
-  function getCellData(cellId: string): CellData {
-    return cells.get(cellId) || { value: "", displayValue: "" };
-  }
+  const getCellData = useCallback(
+    (cellId: string): CellData => {
+      return cells.get(cellId) || { value: "", displayValue: "" };
+    },
+    [cells],
+  );
 
   const handleCellSelect = useCallback((cellId: string) => {
     setSelectedCell(cellId);
@@ -67,7 +43,7 @@ const ExcelGrid: React.FC = () => {
       setEditingCell(cellId);
       setEditValue(cellData.value);
     },
-    [cells],
+    [getCellData],
   );
 
   const handleCellChange = useCallback((value: string) => {
@@ -155,107 +131,108 @@ const ExcelGrid: React.FC = () => {
     ],
   );
 
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLDivElement;
-    const scrollTop = target.scrollTop;
-    const scrollLeft = target.scrollLeft;
-
-    const startRow = Math.floor(scrollTop);
-    const visibleRowCount = Math.ceil(target.clientHeight);
-    const endRow = Math.min(startRow + visibleRowCount + 5, ROW_COUNT);
-
-    const startCol = Math.floor(scrollLeft);
-    const visibleColCount = Math.ceil(target.clientWidth);
-    const endCol = Math.min(startCol + visibleColCount + 2, COL_COUNT);
-
-    setVisibleRows({ start: startRow, end: endRow });
-    setVisibleCols({ start: startCol, end: endCol });
+  const handleScroll = useCallback(() => {
+    // We don't need to calculate visible cells anymore since we're rendering them all
+    // Just keep the function for future optimizations
   }, []);
 
   return (
     <div
-      className="relative overflow-auto"
+      className="relative h-screen w-full overflow-auto"
+      tabIndex={0}
       onKeyDown={handleKeyDown}
       onScroll={handleScroll}
     >
-      <div className="flex">
-        <div
-          className={`${COL_HEADER_WIDTH} ${COL_HEADER_MIN_WIDTH} sticky overflow-hidden`}
-        />
-        {columnHeaders.slice(visibleCols.start, visibleCols.end).map((col) => (
+      <div
+        style={{
+          width: COL_COUNT * COL_WIDTH + 50,
+          height: ROW_COUNT * ROW_HEIGHT + ROW_HEIGHT,
+        }}
+      >
+        <div className="sticky top-0 z-10 flex bg-gray-100">
           <div
-            key={col}
-            className={`text-center font-bold ${COL_HEADER_WIDTH}`}
+            className="sticky left-0 z-20 border border-gray-300 bg-gray-200"
+            style={{ width: "50px", minWidth: "50px", height: ROW_HEIGHT }}
+          />
+
+          {columnHeaders.map((col) => (
+            <div
+              key={col}
+              className="flex items-center justify-center border border-gray-300 text-center font-bold"
+              style={{
+                width: COL_WIDTH,
+                minWidth: COL_WIDTH,
+                height: ROW_HEIGHT,
+                flexShrink: 0,
+              }}
+            >
+              {col}
+            </div>
+          ))}
+        </div>
+
+        {Array.from({ length: ROW_COUNT }).map((_, row) => (
+          <div
+            key={`row-${row}`}
+            className="flex"
+            style={{ height: ROW_HEIGHT }}
           >
-            {col}
+            <div
+              className="sticky left-0 z-10 flex items-center justify-center border border-gray-300 bg-gray-100 text-center font-bold"
+              style={{ width: "50px", minWidth: "50px", height: ROW_HEIGHT }}
+            >
+              {row + 1}
+            </div>
+
+            {columnHeaders.map((colHeader) => {
+              const cellId = `${colHeader}${row + 1}`;
+              const cellData = getCellData(cellId);
+              const isSelected = cellId === selectedCell;
+              const isEditing = cellId === editingCell;
+
+              return (
+                <div
+                  key={`cell-${cellId}`}
+                  className={cn(
+                    "overflow-hidden border border-gray-200 px-1 text-ellipsis whitespace-nowrap",
+                    isSelected ? "outline-2 outline-blue-500" : "",
+                  )}
+                  style={{
+                    width: COL_WIDTH,
+                    minWidth: COL_WIDTH,
+                    height: ROW_HEIGHT,
+                    flexShrink: 0,
+                  }}
+                  onClick={() => handleCellSelect(cellId)}
+                  onDoubleClick={() => handleCellDoubleClick(cellId)}
+                >
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => handleCellChange(e.target.value)}
+                      onBlur={() => handleCellEditComplete(cellId, editValue)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleCellEditComplete(cellId, editValue);
+                        } else if (e.key === "Escape") {
+                          e.preventDefault();
+                          setEditingCell(null);
+                        }
+                        e.stopPropagation();
+                      }}
+                      autoFocus
+                      className="h-full w-full border-none p-0 outline-none"
+                    />
+                  ) : (
+                    <span>{cellData.displayValue}</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
-      </div>
-
-      <div>
-        {Array.from({ length: visibleRows.end - visibleRows.start }).map(
-          (_, rowIndex) => {
-            const row = visibleRows.start + rowIndex;
-            return (
-              <div key={`row-${row}`} className="row flex">
-                <div
-                  className={`${ROW_COL_WIDTH} ${ROW_COL_MIN_WIDTH} sticky left-0 z-[1] text-center font-bold`}
-                >
-                  {row + 1}
-                </div>
-
-                <div className="flex">
-                  {Array.from({
-                    length: visibleCols.end - visibleCols.start,
-                  }).map((_, colIndex) => {
-                    const col = visibleCols.start + colIndex;
-                    const cellId = getCellId(row, col);
-                    const cellData = getCellData(cellId);
-                    const isSelected = cellId === selectedCell;
-                    const isEditing = cellId === editingCell;
-
-                    return (
-                      <div
-                        key={`cell-${cellId}`}
-                        className={cn(
-                          `relative overflow-hidden border border-gray-200 px-1 text-ellipsis whitespace-nowrap ${ROW_COL_WIDTH} ${ROW_COL_MIN_WIDTH}`,
-                          isSelected ? "outline-2 outline-blue-500" : "",
-                        )}
-                        onClick={() => handleCellSelect(cellId)}
-                        onDoubleClick={() => handleCellDoubleClick(cellId)}
-                      >
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => handleCellChange(e.target.value)}
-                            onBlur={() =>
-                              handleCellEditComplete(cellId, editValue)
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleCellEditComplete(cellId, editValue);
-                              } else if (e.key === "Escape") {
-                                e.preventDefault();
-                                setEditingCell(null);
-                              }
-                              e.stopPropagation();
-                            }}
-                            autoFocus
-                            className="font-inherit h-full w-full border-none p-0 text-inherit outline-none"
-                          />
-                        ) : (
-                          <span>{cellData.displayValue}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          },
-        )}
       </div>
     </div>
   );
