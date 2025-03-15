@@ -1,6 +1,12 @@
 "use client";
 import { cn, getColumnLabel } from "@/utils";
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
 
 interface CellData {
   value: string;
@@ -10,7 +16,7 @@ interface CellData {
 
 const ROW_HEIGHT = 30;
 const COL_WIDTH = 80;
-const ROW_COUNT = 10;
+const ROW_COUNT = 50;
 const COL_COUNT = 10;
 
 function evaluateFormula(formula: string): string {
@@ -32,11 +38,14 @@ function evaluateFormula(formula: string): string {
 
 const ExcelGrid: React.FC = () => {
   const [cells, setCells] = useState<Map<string, CellData>>(new Map());
-  const [selectedCell, setSelectedCell] = useState<string | null>(null);
+  const [selectedCell, setSelectedCell] = useState<string | null>("A1");
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [isFormulaBarFocused, setIsFormulaBarFocused] = useState(false);
   const [isEditingFormulaBar, setIsEditingFormulaBar] = useState(false);
+
+  // Add a ref to the grid container for focusing
+  const gridContainerRef = useRef<HTMLDivElement>(null);
 
   const columnHeaders = useMemo(() => {
     const headers = [];
@@ -81,6 +90,22 @@ const ExcelGrid: React.FC = () => {
     setEditValue(value);
   }, []);
 
+  const focusGridWithoutScrolling = useCallback(() => {
+    if (gridContainerRef.current) {
+      const scrollPosition = {
+        top: window.pageYOffset || document.documentElement.scrollTop,
+        left: window.pageXOffset || document.documentElement.scrollLeft,
+      };
+
+      gridContainerRef.current.focus();
+      window.scrollTo(scrollPosition.left, scrollPosition.top);
+    }
+  }, []);
+
+  useEffect(() => {
+    focusGridWithoutScrolling();
+  }, [focusGridWithoutScrolling]);
+
   const handleCellEditComplete = useCallback(
     (cellId: string, newValue: string) => {
       setCells((prevCells) => {
@@ -103,8 +128,12 @@ const ExcelGrid: React.FC = () => {
       });
       setEditingCell(null);
       setIsEditingFormulaBar(false);
+
+      setTimeout(() => {
+        focusGridWithoutScrolling();
+      }, 0);
     },
-    [],
+    [focusGridWithoutScrolling],
   );
 
   const handleFormulaBarKeyDown = useCallback(
@@ -130,6 +159,22 @@ const ExcelGrid: React.FC = () => {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (!selectedCell) return;
+
+      const isPrintableKey =
+        e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey;
+      const isNumericKey = /^[0-9]$/.test(e.key);
+      const isCommonInputChar = /^[a-zA-Z0-9=+\-*/().,]$/.test(e.key);
+
+      if (
+        (isPrintableKey || isNumericKey || isCommonInputChar) &&
+        !editingCell &&
+        !isFormulaBarFocused
+      ) {
+        setEditingCell(selectedCell);
+        setEditValue(e.key);
+        e.preventDefault();
+        return;
+      }
 
       const [colLabel, rowLabel] =
         selectedCell.match(/([A-Z]+)(\d+)/)?.slice(1) || [];
@@ -179,8 +224,18 @@ const ExcelGrid: React.FC = () => {
           if (editingCell) {
             setEditingCell(null);
             setIsEditingFormulaBar(false);
+            setTimeout(() => {
+              focusGridWithoutScrolling();
+            }, 0);
           }
           e.preventDefault();
+          break;
+        case "Delete":
+        case "Backspace":
+          if (!editingCell && !isFormulaBarFocused) {
+            handleCellEditComplete(selectedCell, "");
+            e.preventDefault();
+          }
           break;
       }
     },
@@ -191,6 +246,8 @@ const ExcelGrid: React.FC = () => {
       columnHeaders,
       handleCellDoubleClick,
       handleCellEditComplete,
+      focusGridWithoutScrolling,
+      isFormulaBarFocused,
     ],
   );
 
@@ -211,9 +268,9 @@ const ExcelGrid: React.FC = () => {
   }, [selectedCell]);
 
   return (
-    <>
-      <div className="flex items-center gap-2 p-2">
-        <div className="text-sm font-medium text-gray-500">
+    <div className="flex h-screen flex-col">
+      <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-gray-300 bg-white p-2">
+        <div className="w-12 text-center font-medium">
           {selectedCell || "No cell selected"}
         </div>
         <input
@@ -224,26 +281,17 @@ const ExcelGrid: React.FC = () => {
           onFocus={handleFormulaBarFocus}
           onBlur={handleFormulaBarBlur}
           placeholder="Enter formula or value..."
-          className="flex-1 rounded border border-gray-300 px-2 py-1"
+          className="flex-1 rounded px-2 py-1"
           style={{ minWidth: COL_WIDTH * 3 }}
           onClick={() =>
             selectedCell && handleEditFormulaBar(selectedCell.toString())
           }
           disabled={!selectedCell}
         />
-        <button
-          className="rounded bg-blue-500 px-2 py-1 text-white hover:bg-blue-600"
-          onClick={() => {
-            if (selectedCell) {
-              handleCellEditComplete(selectedCell, editValue);
-            }
-          }}
-        >
-          Apply
-        </button>
       </div>
       <div
-        className="relative h-screen w-full overflow-auto"
+        ref={gridContainerRef}
+        className="flex-1 overflow-auto outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
         onScroll={handleScroll}
@@ -257,7 +305,12 @@ const ExcelGrid: React.FC = () => {
           <div className="sticky top-0 z-10 flex bg-gray-100">
             <div
               className="sticky left-0 z-20 border border-gray-300 bg-gray-200"
-              style={{ width: "50px", minWidth: "50px", height: ROW_HEIGHT }}
+              style={{
+                width: COL_WIDTH,
+                minWidth: "50px",
+                height: ROW_HEIGHT,
+                zIndex: 50,
+              }}
             />
 
             {columnHeaders.map((col) => (
@@ -365,7 +418,7 @@ const ExcelGrid: React.FC = () => {
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
