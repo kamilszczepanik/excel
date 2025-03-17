@@ -24,15 +24,6 @@ export const evaluateFormula = (
 
     const cellRefRegex = /[A-Z]+\d+/g;
 
-    const cellRefs: string[] = Array.from(
-      expression.matchAll(cellRefRegex),
-    ).map((match) => match[0]);
-
-    const formulaCell = formula.match(/^=([A-Z]+\d+)$/);
-    if (formulaCell && cellRefs.includes(formulaCell[1])) {
-      return "#CIRCULAR";
-    }
-
     const evaluableExpression = expression.replace(cellRefRegex, (cellRef) => {
       if (visitedCells.has(cellRef)) {
         throw new Error(`Circular reference detected: ${cellRef}`);
